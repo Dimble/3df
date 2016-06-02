@@ -1,0 +1,7 @@
+VS2015/
+packages/
+tmp/
+
+# vim
+.*.swp
+*~

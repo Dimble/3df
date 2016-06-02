@@ -1,0 +1,91 @@
+--- This is my project notes file.
+-   It serves as a checklist of current and upcoming work, along
+-   with a place to make quick notes of future ideas before they are forgotten.
+-   symbols are * (in testing), D (done), X (cancelled)
+-   ? (possible idea, in flux, needs research, etc)
+-------------------------------------------------------------------------------
+
+dfhack module for DF terrain and visible object info
+	+ get dfhack compiling
+	* add a new plugin
+	D need a name
+		ipc_dm, ipc data monitor
+		D went with delta reader after deciding against dfhack ipc
+	get protobuf working
+		? or something that doesn't involve copying all the data again
+		? leave for late stage optimization
+	determine sets of data needed
+		X function to request each
+		X function to request a delta of each
+			X if this is called without previous data, it returns a full request
+		? determine how to obtain colors of materials, objects, entities, etc
+		- define data packets that are requested as needed
+			- overall status
+				- gamemode, gametype, ...
+			- world map status, once dwarf mode is entered
+				- time, season, weather, ...
+			- tile-based data
+				- tile material, if not dug out
+				- any designation
+				- construction, if present
+				- environmental contents (rain, plants, stuff on the ground in general)
+				- entity contents (dwarves, creatures, ...)
+			? other necessary data
+		- devise deltas
+			? only for tile-based data
+			? batch based on..
+			? not deltas at all, but just the same format as the data packets
+		- Sometime Later
+			- note which map areas have not been requested for 'a while' and free them
+			- plugin commands for debugging, testing, problem workarounds etc
+				- clear a client's state (full data re-send)
+				- disconnect client(s) in case of lockup or whatever
+				- dump, dumps current data in some fashion
+					? output png of maps.. other things do this already
+				- ...
+	- plugin execution model
+		- for now, the plugin runs entirely during onupdate plugin calls
+		? fast enough?
+			? thread to handle and construct client requests
+				? fast enough not to bother with a thread for this
+					? may have to if onupdate is not called during menus, game being paused, etc
+			? thread to scan for changes
+				- very clean, but with some inherent race conditions, and would achieve nothing
+				  if DF has to be paused while comparing data
+				? occasionally wrong tile changes would almost certainly be fixed with the very next scan,
+				  so this might be acceptable
+					? could add some heuristics for ignoring probably-wrong scans
+
+3df viewer
+	D chose Allegro for the 'boring stuff' API
+	* initial compile, basic project setup
+		- start with a class to connect to the delta reader plugin
+			- initial connection test
+	? openscenegraph
+	- draw a block
+	- draw a block with some basic texture
+	- draw multiple blocks in various positions
+	- draw blocks based on current z level of df map
+
+	- ...
+
+	? apply textures to models based on material by default
+	- different models based on material
+		- i.e. stone tables vs metal vs wood vs. grown wood vs ...
+		- various door types
+		- various models of the common constructions (walls, pillars, ...)
+
+--
+	install/build notes
+	- Windows / Visual Studio:
+		- set git config --local autocrlf=off
+		? rework this to create the project with cmake
+		- added DFHACK user macro to the 3df project, used to set the include directory for dr_data.h
+		- clsocket...
+
+git config core.autocrlf false 
+For Visual Studio after cmake:
+	set 3df to the startup project
+	For debugging or dynamic dll's , add to 3df properties->debugging->environment:
+	    PATH=%PATH%;$(ProjectDir)..\..\packages\Allegro.5.2.0.0\build\native\v140\x64\bin
+	- possibly use CMAKE_MSVCIDE_RUN_PATH instead
