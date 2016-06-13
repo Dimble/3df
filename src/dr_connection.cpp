@@ -1,30 +1,22 @@
-// FIXME  remove this and update clsocket
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <stdlib.h>
 
-#include <allegro5/allegro.h>
-#include <ActiveSocket.h>
+#include "MCP.h"
+#include "DFState.h"
 #include "dr_connection.h"
-//#include <plugins/dr_data.h>
+
+// FIXME  remove this and update clsocket
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <ActiveSocket.h>
 
 /*
- *  Not much checking is done on the socket here, as we are connecting to a
+ *  Not much checking is done on the socket overall, as we are connecting to a
  *  local process.
  *  If that changes this will likely need some more network handling.
 */
 
 namespace
 {
-
-// FIXME  this ugly kludge exists only in your mind
-//        ... not sure this can be fixed without adding worse workarounds..
-//void * dr_loop (ALLEGRO_THREAD *thread, void *dr_ptr)
-void * dr_loop (void *dr_ptr)
-    {
-    DeltaReader *dr = reinterpret_cast<DeltaReader *>(dr_ptr);
-    return dr->ThreadFun();
-    }
 
 void ProcessIncoming (uint8 *data, int32 count)
     {
@@ -55,8 +47,8 @@ fprintf(stderr, " %d:%d ", index, data[index]);
                 break;
             }
         index++;
-fprintf(stderr, "\n");
         }
+fprintf(stderr, "\n");
 
     }
 
@@ -81,93 +73,106 @@ uint16 dr_port ()
 
 // -------------------------------------------------------------------
 
-DeltaReader::DeltaReader ()
-  : go_on_then(true)
-    {
-    }
+DeltaReader::DeltaReader (DFState *state)
+  : sock(nullptr), dfstate(state)
+    {}
 
 DeltaReader::~DeltaReader ()
     {
-    if ( sock.IsSocketValid() )
-        Close();
-    }
-
-bool DeltaReader::Connected ()
-    {
-    return sock.IsSocketValid();
-    }
-
-void DeltaReader::Close ()
-    {
-    sock.Close();
-    go_on_then = false;
-    // Send a 'quitting!' message here if there is ever a reason to do that
-    }
-
-//void * DeltaReader::Loop (ALLEGRO_THREAD *thread)
-void * DeltaReader::ThreadFun ()
-    {
-    while ( go_on_then )
+    if ( sock )
         {
-        if ( sock.Select() )  // blocks
-            {
-            int32 received = sock.Receive(8096);
-            if ( received > 0 )
-                ProcessIncoming(sock.GetData(), received);
-            else
-                {
-                if ( received == -1 )
-                    fprintf(stderr, "Lost connection to dfhack: %s\n",
-                            sock.DescribeError());
-                break;
-                }
-            }
-        else
-            {
-            if ( !sock.IsSocketValid() )
-                {
-                break;
-                }
-            }
+        Close();
+        delete sock;
         }
-    return 0;
     }
 
 bool DeltaReader::Connect ()
     {
-    bool ok = false;
-    const char *host;
-    
-    host = getenv("DFHACK_DR_HOST");
-    if ( !host ) host = "localhost";
+    if ( sock ) delete sock;
+    sock = new CActiveSocket();
 
-    if ( !sock.Initialize() )
+    if ( sock->Initialize() )
         {
-        fprintf(stderr, "socket Initialize: %s\n", sock.DescribeError());
-        return false;
+        const char *host = getenv("DFHACK_DR_HOST");
+        if ( !host ) host = "localhost";
+        if ( sock->Open((uint8 *)host, dr_port()) )
+            {
+            if ( !sock->SetNonblocking() )
+                {
+                fprintf(stderr, "DeltaReader.SetNonblocking: %s\n", sock->DescribeError());
+                // FIXME  ideally the connection should block indefinitely
+                sock->SetReceiveTimeout(2, 0);
+                }
+            else
+                {
+                // Backup plan in case non blocking fails.
+                // 100ms should be frequent enough unless something is added
+                // that needs really fast communication
+                sock->SetReceiveTimeout(0, 100 * 1000);
+                }
+            sock->SetOptionReuseAddr();
+            return true;
+            }
+        else
+            fprintf(stderr, "Connection to dfhack via host:%s port:%d failed: %s\n",
+                    host, dr_port(), sock->DescribeError());
         }
-
-    if ( sock.Open((uint8 *)host, dr_port()) )
-        ok = true;
     else
-        fprintf(stderr, "Connection to dfhack via host:%s port:%d failed: %s\n",
-                host, dr_port(), sock.DescribeError());
+        fprintf(stderr, "socket Initialize: %s\n", sock->DescribeError());
 
-    if ( !sock.SetNonblocking() )
-        fprintf(stderr, "DeltaReader.SetNonblocking: %s\n", sock.DescribeError());
-    sock.SetOptionReuseAddr();
-    sock.SetReceiveTimeout(0, 25 * 1000);  // just in case, 25ms
+    delete sock; sock = nullptr;
+    return false;
+    }
 
-    if ( ok )
+bool DeltaReader::Connected ()
+    {
+    return sock->IsSocketValid();
+    }
+
+void DeltaReader::Close ()
+    {
+    if ( sock->IsSocketValid() )
+        sock->Close();
+    }
+
+void DeltaReader::Shutdown ()
+    {
+    if ( sock->IsSocketValid() )
+        sock->Shutdown(CSimpleSocket::Both);
+    }
+
+// returns false on lost connection
+bool DeltaReader::Process ()
+    {
+fprintf(stderr, "DeltaReader::Process\n");
+    if ( sock->Select(true, false) )  // should block regardless of Nonblocking status
         {
-#if 0
-        thread = al_create_thread(&dr_loop, this);
-        al_start_thread(thread);
-#endif        
-        al_run_detached_thread(&dr_loop, this);
+fprintf(stderr, "DeltaReader::Selected: ");
+        int32 received = sock->ReceiveAvailable(8096);
+fprintf(stderr, "%d\n", received);
+        if ( received > 0 )
+            ProcessIncoming(sock->GetData(), received);
+        else
+            {
+            if ( received == -1 )
+                {
+                fprintf(stderr, "Lost connection to dfhack: %s\n",
+                        sock->DescribeError());
+                return false;
+                }
+            }
+        }
+    else
+        {
+        if ( !sock->IsSocketValid() )
+            {
+            fprintf(stderr, "Lost dfhack connection: %s\n",
+                    sock->DescribeError());
+            return false;
+            }
         }
 
-    return ok;
+    return true;
     }
 
 // vim: ts=4 sw=4 ai expandtab cinoptions={1s,g.5s,h.5s,N-s

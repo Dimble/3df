@@ -11,9 +11,6 @@ dfhack module for DF terrain and visible object info
 	D need a name
 		ipc_dm, ipc data monitor
 		D went with delta reader after deciding against dfhack ipc
-	get protobuf working
-		? or something that doesn't involve copying all the data again
-		? leave for late stage optimization
 	determine sets of data needed
 		X function to request each
 		X function to request a delta of each
@@ -59,8 +56,27 @@ dfhack module for DF terrain and visible object info
 3df viewer
 	D chose Allegro for the 'boring stuff' API
 	* initial compile, basic project setup
-		- start with a class to connect to the delta reader plugin
-			- initial connection test
+		D start with a class to connect to the delta reader plugin
+			D initial connection test
+	- initial execution structure
+		- main input loop
+		- create DFState, which creates DeltaReader
+		- attempt DFState.connect, which passes self to DeltaReader to connect.
+			- if connection successful, start DFState loop thread,
+			  this thread repeatedly calls DeltaReader reading loop until blah
+			  - this allows DFState to exit delta reader thread
+
+    - How to handle events
+        - keyboard/mouse/etc
+          -> window(ui) -> renderer
+          -> window(ui) -> dfstate (connect, pause, close, input passthrough)
+        - window/OS
+          -> renderer (resize/position, ?)
+          -> dfstate (close)
+        - dfstate
+          -> window(ui)
+          -> renderer
+
 	? openscenegraph
 	- draw a block
 	- draw a block with some basic texture

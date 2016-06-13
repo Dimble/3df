@@ -3,34 +3,25 @@
 
 #include <allegro5/allegro.h>
 
-#include "dr_connection.h"
- 
-int main(int argc, char **argv){
-    ALLEGRO_DISPLAY *display = 0;
-    DeltaReader dr;
- 
-   if(!al_init()) {
-      fprintf(stderr, "failed to initialize allegro!\n");
-      return -1;
-   }
- 
-   display = al_create_display(640, 480);
-   if(!display) {
-      fprintf(stderr, "failed to create display!\n");
-      return -1;
-   }
- 
-    al_clear_to_color(al_map_rgb(0,0,0));
- 
-    al_flip_display();
+#include "MCP.h"
 
-    dr.Connect();
- 
-    al_rest(100.0);
- 
-    al_destroy_display(display);
- 
+int main (int argc, char **argv)
+    {
+    if ( !al_init() )
+        {
+        fprintf(stderr, "3df: failed to initialize allegro\n");
+        return -1;
+        }
+
+    // TODO  parse command arguments
+
+    if ( mcp::Initialize() )  // TODO  pass init commands here
+        {
+        mcp::MainLoop();
+        }
+
+char buf[501];
+fgets(buf, 500, stdin);
     return 0;
     }
 
-// vim: ts=4 sw=4 ai expandtab cinoptions={1s,g.5s,h.5s,N-s

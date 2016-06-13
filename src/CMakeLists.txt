@@ -15,11 +15,21 @@ Add_Subdirectory(clsocket)
 
 Set(3DF_SOURCE
     "main.cpp"
+    "MCP.cpp"
+    "DFState.cpp"
     "dr_connection.cpp"
+    "Event.cpp"
+    "Input.cpp"
+    "Window.cpp"
    )
 
 Set(3DF_HEADER
+    "MCP.h"
+    "DFState.h"
     "dr_connection.h"
+    "Event.h"
+    "Input.h"
+    "Window.h"
    )
 # shouldn't need this
 #Set_Source_Files_Properties(${3DF_HEADER} PROPERTIES HEADER_FILE_ONLY TRUE)
